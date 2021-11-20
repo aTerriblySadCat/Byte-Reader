@@ -1,4 +1,6 @@
-﻿Console.OutputEncoding = System.Text.Encoding.Unicode;
+﻿using System.Text;
+
+Console.OutputEncoding = Encoding.UTF8;
 
 Console.WriteLine("Please enter the path to the file from where to read:");
 string filePath = Console.ReadLine();
@@ -17,93 +19,103 @@ if (skipCountStr != null && skipCountStr != "")
 	skipCount = long.Parse(skipCountStr);
 }
 
-Console.WriteLine();
-Console.WriteLine("Skipping...");
-using (StreamReader sr = new StreamReader(filePath))
+using (Stream s = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
 {
-	long readCount = 0;
-
-	char[] skipBlock = null;
+	s.Position = skipCount;
 	long bytesRead = 0;
-	if (skipCount > int.MaxValue / sizeof(char))
-	{
-		skipBlock = new char[int.MaxValue / sizeof(char)];
-		while (true)
-		{
-			int length = skipBlock.Length;
-			if(readCount + length > skipCount)
-			{
-				length = (int)(skipCount - readCount);
-			}
-
-			bytesRead = sr.ReadBlock(skipBlock, 0, length);
-			readCount += bytesRead;
-			if (readCount >= skipCount || length > bytesRead)
-			{
-				break;
-			}
-		}
-	}
-	else
-	{
-		skipBlock = new char[skipCount];
-		bytesRead = sr.ReadBlock(skipBlock, 0, (int)skipCount);
-		readCount += bytesRead;
-	}
-
-	Array.Clear(skipBlock);
+	long totalBytesRead = skipCount;
 
 	Console.WriteLine();
 	Console.WriteLine("Press Enter to read " + lineCountStr + " bytes from the given file.");
-	Console.WriteLine("Press Space to display the last shown text in hexadecimal.");
+	Console.WriteLine("Press Space to display the last shown text in UTF8.");
 	Console.WriteLine("Press Escape to quit.");
 	Console.WriteLine();
 
-	long lastBytesRead = 0;
-	char[] lastBlock = new char[byteCount];
+	byte[] lastBlock = new byte[byteCount];
 	while (true)
 	{
 		ConsoleKeyInfo keyInfo = Console.ReadKey();
 		if (keyInfo.Key == ConsoleKey.Enter)
 		{
+			Console.WriteLine();
+
+			long readCount = 0;
+			Console.WriteLine(totalBytesRead);
 			while (true)
 			{
-				char[] readBlock = null;
-				if(byteCount > int.MaxValue / sizeof(char))
+				byte[] readBlock = null;
+				if (byteCount > int.MaxValue / sizeof(byte))
 				{
-					readBlock = new char[int.MaxValue / sizeof(char)];
-					for(long i = 0; i < byteCount; i += bytesRead)
+					int readLength = int.MaxValue / sizeof(byte);
+					if(readCount + readLength > byteCount)
 					{
-						bytesRead = sr.ReadBlock(readBlock, 0, readBlock.Length);
-						if(readBlock.Length > bytesRead)
-						{
-							break;
-						}
+						readLength = (int)(byteCount - readCount);
 					}
+
+					readBlock = new byte[int.MaxValue / sizeof(byte)];
+					bytesRead = s.Read(readBlock, 0, readLength);
+					readCount += bytesRead;
 				}
 				else
 				{
-					readBlock = new char[byteCount];
-					bytesRead = sr.ReadBlock(readBlock, 0, (int)byteCount);
+					readBlock = new byte[byteCount];
+					bytesRead = s.Read(readBlock, 0, (int)byteCount);
+					readCount += bytesRead;
 				}
-				
+
+				totalBytesRead += bytesRead;
 				if (readBlock != null)
 				{
 					lastBlock = readBlock;
-					lastBytesRead = bytesRead;
 
-					string readStr = new string(readBlock);
-					if (readStr.Length > 0 && !String.IsNullOrWhiteSpace(readStr) && !String.IsNullOrEmpty(readStr) && !readStr.All(x => x == 0))
+					int lineWidth = 0;
+					int consoleWidth = Console.WindowWidth;
+					byte lastByte = 0;
+					int lastByteCount = 0;
+					for (int i = 0; i < readBlock.Length; i++)
 					{
-						Console.WriteLine(readCount + "|" + readStr);
-						readCount += bytesRead;
-						break;
+						byte b = readBlock[i];
+						if (b == lastByte)
+						{
+							lastByteCount += 1;
+						}
+
+						if (b != lastByte || i == readBlock.Length - 1)
+						{
+							if (lastByteCount > 1)
+							{
+								int lineLength = lastByteCount.ToString().Length + 7;
+								if(lineWidth + lineLength > consoleWidth)
+								{
+									Console.WriteLine();
+									lineWidth = 0;
+								}
+
+								Console.Write(lastByteCount + "{" + String.Format(@"\x{0:x2}", lastByte) + "} ");
+								lineWidth += lineLength;
+							}
+
+							if (b != lastByte)
+							{
+								lastByte = b;
+								lastByteCount = 1;
+
+								if (lineWidth + 7 > consoleWidth)
+								{
+									Console.WriteLine();
+									lineWidth = 0;
+								}
+
+								Console.Write("{" + String.Format(@"\x{0:x2}", b) + "} ");
+								lineWidth += 7;
+							}
+						}
 					}
-					else
-					{
-						readCount += bytesRead;
-						continue;
-					}
+				}
+
+				if (readCount >= byteCount)
+				{
+					break;
 				}
 			}
 
@@ -118,12 +130,7 @@ using (StreamReader sr = new StreamReader(filePath))
 		else if (keyInfo.Key == ConsoleKey.Spacebar)
 		{
 			Console.WriteLine();
-			Console.Write((readCount - lastBytesRead) + "|");
-			foreach (char c in lastBlock)
-			{
-				Console.Write("{" + String.Format(@"\x{0:x2}", (byte)c) + "} ");
-			}
-			Console.WriteLine();
+			Console.WriteLine(Encoding.UTF8.GetString(lastBlock));
 		}
 		else if (keyInfo.Key == ConsoleKey.Escape)
 		{
