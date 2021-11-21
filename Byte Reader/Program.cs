@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using Byte_Reader;
+using System.Text;
 
 Console.OutputEncoding = Encoding.UTF8;
 
@@ -18,6 +19,15 @@ if (skipCountStr != null && skipCountStr != "")
 {
 	skipCount = long.Parse(skipCountStr);
 }
+
+Console.WriteLine();
+Console.WriteLine("And finally, please choose the manner in which the hexadecimal is displayed.");
+Console.WriteLine("1. {\\x00} with collapsed repeats.");
+Console.WriteLine("2. {\\x00}");
+Console.WriteLine("3. 0x00");
+Console.WriteLine("4. 00");
+string choiceStr = Console.ReadLine();
+int choice = int.Parse(choiceStr);
 
 using (Stream s = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
 {
@@ -67,49 +77,21 @@ using (Stream s = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileS
 				if (readBlock != null)
 				{
 					lastBlock = readBlock;
-
-					int lineWidth = 0;
-					int consoleWidth = Console.WindowWidth;
-					byte lastByte = 0;
-					int lastByteCount = 0;
-					for (int i = 0; i < readBlock.Length; i++)
+					switch(choice)
 					{
-						byte b = readBlock[i];
-						if (b == lastByte)
-						{
-							lastByteCount += 1;
-						}
-
-						if (b != lastByte || i == readBlock.Length - 1)
-						{
-							if (lastByteCount > 1)
-							{
-								int lineLength = lastByteCount.ToString().Length + 7;
-								if(lineWidth + lineLength > consoleWidth)
-								{
-									Console.WriteLine();
-									lineWidth = 0;
-								}
-
-								Console.Write(lastByteCount + "{" + String.Format(@"\x{0:x2}", lastByte) + "} ");
-								lineWidth += lineLength;
-							}
-
-							if (b != lastByte)
-							{
-								lastByte = b;
-								lastByteCount = 1;
-
-								if (lineWidth + 7 > consoleWidth)
-								{
-									Console.WriteLine();
-									lineWidth = 0;
-								}
-
-								Console.Write("{" + String.Format(@"\x{0:x2}", b) + "} ");
-								lineWidth += 7;
-							}
-						}
+						default:
+						case 1:
+							BlockPrinter.Print1(readBlock);
+							break;
+						case 2:
+							BlockPrinter.Print2(readBlock);
+							break;
+						case 3:
+							BlockPrinter.Print3(readBlock);
+							break;
+						case 4:
+							BlockPrinter.Print4(readBlock);
+							break;
 					}
 				}
 
